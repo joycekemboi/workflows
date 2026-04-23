@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Refund Workflows</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #f6f8fa;
+    --surface2: #edf0f4;
+    --border: #d0d7de;
+    --accent: #0070f3;
+    --accent2: #6d28d9;
+    --accent3: #059669;
+    --warn: #d97706;
+    --danger: #dc2626;
+    --text: #1a1f2e;
+    --text-muted: #57606a;
+    --maker: #0e7490;
+    --maker-bg: #ecfeff;
+    --maker-border: #67e8f9;
+    --maker-icon-bg: #cffafe;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'IBM Plex Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  .header {
+    padding: 22px 40px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0;
+    background: rgba(255,255,255,0.97);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+    flex-wrap: wrap; gap: 12px;
+  }
+  .header-left h1 { font-family: 'IBM Plex Mono', monospace; font-size: 15px; font-weight: 600; }
+  .header-left span { font-size: 10px; color: var(--text-muted); font-family: 'IBM Plex Mono', monospace; display: block; margin-top: 2px; }
+  .tab-row { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 4px; flex-wrap: wrap; }
+  .tab { padding: 7px 16px; border-radius: 5px; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.2s; color: var(--text-muted); border: none; background: transparent; font-family: 'IBM Plex Sans', sans-serif; white-space: nowrap; }
+  .tab.active { background: #fff; color: var(--accent); border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  .main { padding: 36px 40px 80px; max-width: 1000px; margin: 0 auto; }
+  .workflow-panel { display: none; }
+  .workflow-panel.active { display: block; }
+
+  .workflow-title { font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 28px; display: flex; align-items: center; gap: 10px; }
+  .workflow-title::after { content:''; flex:1; height:1px; background:var(--border); }
+
+  .flow { display:flex; flex-direction:column; align-items:center; gap:0; }
+
+  /* Nodes */
+  .node { display:flex; align-items:center; gap:12px; padding:12px 16px; border-radius:8px; border:1px solid var(--border); background:var(--surface); width:600px; transition:all 0.18s; cursor:default; }
+  .node:hover { border-color:var(--accent); background:var(--surface2); transform:translateX(2px); }
+  .node-icon { width:30px; height:30px; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:14px; }
+  .node-text { flex:1; }
+  .node-label { font-size:13px; font-weight:500; color:var(--text); line-height:1.4; }
+  .node-sub { font-size:11px; color:var(--text-muted); margin-top:2px; font-family:'IBM Plex Mono',monospace; }
+  .node-badge { font-size:10px; font-family:'IBM Plex Mono',monospace; font-weight:600; padding:2px 8px; border-radius:4px; letter-spacing:.05em; flex-shrink:0; }
+
+  .node-start  { border-color:var(--accent); background:#eff6ff; }
+  .node-start  .node-icon  { background:#dbeafe; color:var(--accent); }
+  .node-start  .node-badge { background:#dbeafe; color:var(--accent); border:1px solid #93c5fd; }
+  .node-api    { border-color:var(--accent2); background:#f5f3ff; }
+  .node-api    .node-icon  { background:#ede9fe; color:var(--accent2); }
+  .node-api    .node-badge { background:#ede9fe; color:var(--accent2); border:1px solid #c4b5fd; }
+  .node-db     { border-color:#2563eb; background:#eff6ff; }
+  .node-db     .node-icon  { background:#dbeafe; color:#2563eb; }
+  .node-db     .node-badge { background:#dbeafe; color:#2563eb; border:1px solid #93c5fd; }
+  .node-process{ border-color:var(--border); background:var(--surface); }
+  .node-process .node-icon { background:var(--surface2); color:var(--text-muted); }
+  .node-ext    { border-color:var(--warn); background:#fffbeb; }
+  .node-ext    .node-icon  { background:#fef3c7; color:var(--warn); }
+  .node-ext    .node-badge { background:#fef3c7; color:var(--warn); border:1px solid #fcd34d; }
+  .node-success{ border-color:var(--accent3); background:#ecfdf5; }
+  .node-success .node-icon  { background:#d1fae5; color:var(--accent3); }
+  .node-success .node-badge { background:#d1fae5; color:var(--accent3); border:1px solid #6ee7b7; }
+  .node-end    { border-color:#e11d48; background:#fff1f2; }
+  .node-end    .node-icon  { background:#ffe4e6; color:#e11d48; }
+  .node-end    .node-badge { background:#ffe4e6; color:#e11d48; border:1px solid #fca5a5; }
+  .node-void   { border-color:#7c3aed; background:#f5f3ff; }
+  .node-void   .node-icon  { background:#ede9fe; color:#7c3aed; }
+  .node-void   .node-badge { background:#ede9fe; color:#7c3aed; border:1px solid #c4b5fd; }
+  .node-result { border-color:#0070f3; background:#eff6ff; }
+  .node-result .node-icon { background:#dbeafe; color:#0070f3; }
+  .node-result .node-badge { background:#dbeafe; color:#0070f3; border:1px solid #93c5fd; }
+
+  /* Connectors */
+  .conn { width:2px; height:22px; background:var(--border); margin:0 auto; position:relative; flex-shrink:0; }
+  .conn::after { content:''; position:absolute; bottom:-5px; left:50%; transform:translateX(-50%); border-left:5px solid transparent; border-right:5px solid transparent; border-top:7px solid var(--border); }
+  .conn-blue::after { border-top-color:var(--accent); }
+  .conn-blue { background:var(--accent); }
+  .conn-maker { background:var(--maker); }
+  .conn-maker::after { border-top-color:var(--maker); }
+
+  /* Decision */
+  .decision-wrap { display:flex; flex-direction:column; align-items:center; width:600px; }
+  .decision-label { font-size:10px; font-family:'IBM Plex Mono',monospace; color:var(--text-muted); text-transform:uppercase; letter-spacing:.09em; margin-bottom:5px; }
+  .diamond { padding:13px 26px; background:#f5f3ff; border:1.5px solid var(--accent2); border-radius:8px; font-size:12px; font-weight:600; font-family:'IBM Plex Mono',monospace; color:var(--accent2); text-align:center; }
+
+  /* Divider */
+  .divider { width:600px; display:flex; align-items:center; gap:12px; margin:6px 0; }
+  .divider::before,.divider::after { content:''; flex:1; height:1px; background:var(--border); }
+  .divider span { font-size:10px; font-family:'IBM Plex Mono',monospace; color:var(--text-muted); text-transform:uppercase; letter-spacing:.1em; white-space:nowrap; }
+
+  /* Branches */
+  .branches { display:flex; justify-content:center; gap:16px; width:600px; }
+  .branch { flex:1; display:flex; flex-direction:column; align-items:center; }
+  .branch .node { width:100%; }
+
+  .blabel { font-size:10px; font-family:'IBM Plex Mono',monospace; font-weight:700; padding:3px 10px; border-radius:4px; letter-spacing:.07em; text-transform:uppercase; }
+  .blabel-card  { background:#d1fae5; color:#065f46; border:1px solid #6ee7b7; }
+  .blabel-mpesa { background:#fef3c7; color:#92400e; border:1px solid #fcd34d; }
+  .blabel-momo  { background:#ede9fe; color:#5b21b6; border:1px solid #c4b5fd; }
+
+  /* 3-col branches (Support Admin with Momo Manager) */
+  .branches-3 { display:flex; justify-content:center; gap:14px; width:600px; }
+  .branch-3 { flex:1; display:flex; flex-direction:column; align-items:center; }
+  .branch-3 .node { width:100%; }
+
+  /* Merge */
+  .merge { width:600px; border:1px dashed var(--border); border-radius:8px; padding:10px 16px; display:flex; align-items:center; gap:10px; background:var(--surface2); }
+  .merge-icon { font-size:14px; color:var(--text-muted); }
+  .merge-text { font-size:12px; color:var(--text-muted); font-family:'IBM Plex Mono',monospace; }
+
+  /* Callbacks */
+  .callback-row { display:flex; align-items:stretch; gap:10px; width:100%; }
+  .callback-line { width:3px; border-radius:3px; background:linear-gradient(to bottom,var(--accent3),var(--danger)); flex-shrink:0; }
+  .callback-content { flex:1; display:flex; flex-direction:column; gap:6px; }
+  .cb-ok  { display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:6px; font-size:11px; font-weight:500; background:#ecfdf5; border:1px solid #6ee7b7; color:#065f46; }
+  .cb-fail{ display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:6px; font-size:11px; font-weight:500; background:#fff1f2; border:1px solid #fca5a5; color:#991b1b; }
+
+  /* Maker-Checker */
+  .maker-panel { border-radius:8px; border:1.5px solid var(--maker); background:var(--maker-bg); width:600px; overflow:hidden; }
+  .maker-panel-sm { border-radius:8px; border:1.5px solid var(--maker); background:var(--maker-bg); width:100%; overflow:hidden; }
+  .maker-header { padding:10px 14px; background:var(--maker-icon-bg); border-bottom:1px solid var(--maker-border); display:flex; align-items:center; gap:8px; }
+  .maker-header-icon { width:26px; height:26px; border-radius:5px; background:#fff; border:1px solid var(--maker-border); display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0; }
+  .maker-title { font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:700; color:var(--maker); text-transform:uppercase; letter-spacing:.07em; flex:1; }
+  .maker-badge { font-size:10px; font-family:'IBM Plex Mono',monospace; font-weight:600; padding:2px 8px; border-radius:4px; background:var(--maker-icon-bg); color:var(--maker); border:1px solid var(--maker-border); letter-spacing:.05em; }
+  .maker-body { padding:12px 14px; display:flex; flex-direction:column; gap:8px; }
+  .maker-row { display:flex; align-items:flex-start; gap:10px; padding:8px 10px; border-radius:6px; background:#fff; border:1px solid var(--maker-border); }
+  .maker-row-icon { width:28px; height:28px; border-radius:5px; background:var(--maker-icon-bg); display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; }
+  .maker-row-label { font-size:12px; font-weight:600; color:var(--maker); line-height:1.3; }
+  .maker-row-sub { font-size:10px; color:var(--text-muted); font-family:'IBM Plex Mono',monospace; margin-top:2px; }
+  .maker-outcomes { display:flex; gap:8px; }
+  .maker-outcome { flex:1; padding:7px 10px; border-radius:5px; font-size:10px; font-family:'IBM Plex Mono',monospace; font-weight:600; text-align:center; line-height:1.4; }
+  .maker-approve { background:#d1fae5; color:#065f46; border:1px solid #6ee7b7; }
+  .maker-reject  { background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; }
+
+  /* sm maker */
+  .maker-title-sm  { font-size:10px; }
+  .maker-badge-sm  { font-size:9px; padding:2px 6px; }
+  .maker-header-sm { padding:8px 12px; }
+  .maker-body-sm   { padding:10px 12px; gap:6px; }
+  .maker-row-sm    { padding:6px 8px; }
+  .maker-row-icon-sm { width:22px; height:22px; font-size:12px; }
+  .maker-row-label-sm { font-size:11px; }
+  .maker-row-sub-sm   { font-size:9px; }
+  .maker-outcome-sm   { font-size:9px; padding:5px 8px; }
+
+  /* Column connectors */
+  .col-conn { width:2px; height:18px; background:var(--border); margin:0 auto; position:relative; flex-shrink:0; }
+  .col-conn::after { content:''; position:absolute; bottom:-4px; left:50%; transform:translateX(-50%); border-left:4px solid transparent; border-right:4px solid transparent; border-top:5px solid var(--border); }
+
+  /* Branch connector helpers */
+  .bconn { width:2px; height:16px; margin:0 auto; position:relative; flex-shrink:0; }
+  .bconn::after { content:''; position:absolute; bottom:-4px; left:50%; transform:translateX(-50%); border-left:4px solid transparent; border-right:4px solid transparent; border-top:5px solid currentColor; }
+  .bconn-mpesa { background:#d97706; color:#d97706; }
+  .bconn-card  { background:#059669; color:#059669; }
+  .bconn-momo  { background:#7c3aed; color:#7c3aed; }
+
+  /* legend */
+  .legend { display:flex; flex-wrap:wrap; gap:14px; margin-bottom:28px; padding:12px 16px; background:var(--surface); border:1px solid var(--border); border-radius:8px; width:600px; }
+  .legend-item { display:flex; align-items:center; gap:7px; font-size:11px; color:var(--text-muted); }
+  .ldot { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
+
+  /* Phase box (Momo) */
+  .phase-box { width:100%; border-radius:8px; padding:10px; border:2px dashed #fbbf24; background:#fef9ec; }
+  .phase-box-title { font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:700; color:#92400e; margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+  .phase-row { display:flex; gap:6px; align-items:flex-start; margin-bottom:5px; font-size:9px; color:var(--text-muted); font-family:'IBM Plex Mono',monospace; line-height:1.4; }
+  .phase-row:last-child { margin-bottom:0; }
+  .phase-badge { flex-shrink:0; padding:1px 6px; border-radius:3px; font-weight:700; font-size:9px; }
+  .phase-badge-1 { background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; }
+  .phase-badge-2 { background:#dbeafe; color:#1d4ed8; border:1px solid #93c5fd; }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  .live-dot { width:6px; height:6px; border-radius:50%; background:var(--accent3); display:inline-block; animation:pulse 2s infinite; margin-right:4px; }
+
+  @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .flow > * { animation:fadeUp 0.25s ease both; }
+  .flow > *:nth-child(n) { animation-delay: calc(var(--i, 0) * 0.05s); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>Refund Portal Workflows</h1>
+    <span>Pesapal · v3.1 · 5 flows documented</span>
+  </div>
+  <div class="tab-row">
+    <button class="tab active" onclick="switchTab('w1',this)">WF 1 · Merchant · Mpesa</button>
+    <button class="tab"        onclick="switchTab('w2',this)">WF 2 · Merchant · Card</button>
+    <button class="tab"        onclick="switchTab('w3',this)">WF 3 · Support Admin · Mpesa</button>
+    <button class="tab"        onclick="switchTab('w4',this)">WF 4 · Support Admin · Card</button>
+    <button class="tab"        onclick="switchTab('w5',this)">WF 5 · KPLC Auto Reversals</button>
+  </div>
+</div>
+
+<div class="main">
+
+<!-- ══════════════════════════════════════════
+     WORKFLOW 1 — MERCHANT DASHBOARD · MPESA
+     ══════════════════════════════════════════ -->
+<div class="workflow-panel active" id="panel-w1">
+  <div class="workflow-title"><span class="live-dot"></span>Workflow 1 — Merchant Dashboard · Mpesa Refund</div>
+  <div class="flow">
+
+    <div class="legend">
+      <div class="legend-item"><div class="ldot" style="background:#0070f3"></div>Entry / UI</div>
+      <div class="legend-item"><div class="ldot" style="background:#6d28d9"></div>API call</div>
+      <div class="legend-item"><div class="ldot" style="background:#2563eb"></div>Database</div>
+      <div class="legend-item"><div class="ldot" style="background:#d97706"></div>External service</div>
+      <div class="legend-item"><div class="ldot" style="background:#059669"></div>Success / notify</div>
+      <div class="legend-item"><div class="ldot" style="background:#0e7490"></div>Maker-Checker</div>
+    </div>
+
+    <!-- 1. Entry -->
+    <div class="node node-start">
+      <div class="node-icon">🧑‍💼</div>
+      <div class="node-text"><div class="node-label">Merchant initiates refund</div><div class="node-sub">👤 Merchant Dashboard UI</div></div>
+      <div class="node-badge">START</div>
+    </div>
+    <div class="conn conn-blue"></div>
+
+    <!-- 2. API call to portal -->
+    <div class="node node-api">
+      <div class="node-icon">🔌</div>
+      <div class="node-text"><div class="node-label">Merchant Dashboard → Refund Portal</div><div class="node-sub">📤 POST /refund · { amount, confirmation_code }</div></div>
+      <div class="node-badge">API CALL</div>
+    </div>
+    <div class="conn"></div>
+
+    <!-- 3. DB Query — gets everything needed -->
+    <div class="node node-db">
+      <div class="node-icon">🗄️</div>
+      <div class="node-text"><div class="node-label">Refund Portal queries Fusion DB</div><div class="node-sub">🔍 payment_type · payment_method · original_amount · remaining_balance · shortcode · callback_url</div></div>
+      <div class="node-badge">DB QUERY</div>
+    </div>
+    <div class="conn"></div>
+
+    <div class="divider"><span>Transaction found · Refund Portal creates refund request</span></div>
+    <div class="conn conn-maker"></div>
+
+    <!-- 4. Maker-Checker — happens after DB lookup, on the created request -->
+    <div class="maker-panel">
+      <div class="maker-header">
+        <div class="maker-header-icon">🔐</div>
+        <div class="maker-title">Maker-Checker · Handled by Refund Portal</div>
+        <div class="maker-badge">ACCESS CONTROL</div>
+      </div>
+      <div class="maker-body">
+        <div class="maker-row">
+          <div class="maker-row-icon">✍️</div>
+          <div>
+            <div class="maker-row-label">Maker — Submits Refund Request</div>
+            <div class="maker-row-sub">Portal logs request as pending-approval · Merchant-side initiator confirms amount, payment_type &amp; shortcode</div>
+          </div>
+        </div>
+        <div class="maker-row">
+          <div class="maker-row-icon">👁️</div>
+          <div>
+            <div class="maker-row-label">Checker — Reviews &amp; Authorises</div>
+            <div class="maker-row-sub">Second authorised user reviews request details · approves or rejects</div>
+          </div>
+        </div>
+        <div class="maker-outcomes">
+          <div class="maker-outcome maker-approve">✅ APPROVED<br>Flow continues →</div>
+          <div class="maker-outcome maker-reject">❌ REJECTED<br>Request cancelled · Merchant notified</div>
+        </div>
+      </div>
+    </div>
+    <div class="conn conn-maker"></div>
+
+    <!-- 5. Portal → Mpesa Refunds Service (shared — before any branching) -->
+    <div class="node node-ext">
+      <div class="node-icon">💸</div>
+      <div class="node-text"><div class="node-label">Refund Portal → Mpesa Refunds Service</div><div class="node-sub">📤 Sends: shortcode · amount · callback_url (from DB) · payment_type flag</div></div>
+      <div class="node-badge">REQUEST</div>
+    </div>
+    <div class="conn" style="background:#d97706"></div>
+
+    <!-- 6. Mpesa Refunds → Safaricom (shared) -->
+    <div class="node node-ext">
+      <div class="node-icon">📡</div>
+      <div class="node-text"><div class="node-label">Mpesa Refunds Service → Safaricom API</div><div class="node-sub">📤 Reverse payment on Safaricom end</div></div>
+    </div>
+    <div class="conn" style="background:#d97706"></div>
+
+    <!-- 7. Callback (shared) -->
+    <div class="callback-row" style="width:600px">
+      <div class="callback-line"></div>
+      <div class="callback-content">
+        <div class="cb-ok">✅ Mpesa Refunds Service → Refund Portal: SUCCESS</div>
+        <div class="cb-fail">❌ Mpesa Refunds Service → Refund Portal: FAILURE</div>
+      </div>
+    </div>
+    <div class="conn"></div>
+
+    <!-- 8. Branch AFTER callback — Ecom vs POS notify their respective services -->
+    <div class="divider"><span>Portal routes status notification by payment_type</span></div>
+    <div class="conn"></div>
+
+    <div class="decision-wrap">
+      <div class="decision-label">Notification route — based on payment_type from DB</div>
+      <div class="diamond">Ecom &nbsp;or&nbsp; POS?</div>
+    </div>
+    <div class="conn"></div>
+
+    <div class="branches">
+
+      <!-- ECOM -->
+      <div class="branch">
+        <div class="blabel blabel-mpesa">Ecom</div>
+        <div class="bconn bconn-mpesa"></div>
+        <div class="node node-api" style="width:100%">
+          <div class="node-icon">🔁</div>
+          <div class="node-text"><div class="node-label">Portal → Pesapal Mobile</div><div class="node-sub">📤 Notify refund status · service updates own DB</div></div>
+        </div>
+        <div class="bconn bconn-mpesa"></div>
+        <div class="node node-db" style="width:100%">
+          <div class="node-icon">📝</div>
+          <div class="node-text"><div class="node-label">Pesapal Mobile → Fusion DB</div><div class="node-sub">💾 Refund status, updated balances</div></div>
+        </div>
+      </div><!-- /ecom -->
+
+      <!-- POS -->
+      <div class="branch">
+        <div class="blabel blabel-mpesa">POS</div>
+        <div class="bconn bconn-mpesa"></div>
+        <div class="node node-api" style="width:100%">
+          <div class="node-icon">🔁</div>
+          <div class="node-text"><div class="node-label">Portal → MOMOPos</div><div class="node-sub">📤 Notify refund status · service updates own DB</div></div>
+        </div>
+        <div class="bconn bconn-mpesa"></div>
+        <div class="node node-db" style="width:100%">
+          <div class="node-icon">📝</div>
+          <div class="node-text"><div class="node-label">MOMOPos → Fusion DB</div><div class="node-sub">💾 Refund status, updated balances</div></div>
+        </div>
+      </div><!-- /pos -->
+
+    </div><!-- /branches -->
+
+    <div class="conn"></div>
+    <div class="merge"><div class="merge-icon">⇣</div><div class="merge-text">Refund Portal consolidates final status</div></div>
+    <div class="conn conn-blue"></div>
+
+    <div class="node node-success">
+      <div class="node-icon">🔔</div>
+      <div class="node-text"><div class="node-label">Refund Portal → Merchant Dashboard</div><div class="node-sub">📤 Send success / failure result</div></div>
+      <div class="node-badge">NOTIFY</div>
+    </div>
+    <div class="conn conn-blue"></div>
+
+    <div class="node node-end">
+      <div class="node-icon">✅</div>
+      <div class="node-text"><div class="node-label">Merchant Dashboard pulls updated records from Fusion DB</div><div class="node-sub">📥 Updated balances, refund history &amp; confirmation</div></div>
+      <div class="node-badge">END</div>
+    </div>
+
+  </div>
+</div><!-- /panel-w1 -->
+
+
+<!-- ══════════════════════════════════════════
+     WORKFLOW 2 — MERCHANT DASHBOARD · CARD
+     ══════════════════════════════════════════ -->
+<div class="workflow-panel" id="panel-w2">
+  <div class="workflow-title"><span class="live-dot"></span>Workflow 2 — Merchant Dashboard · Card Refund</div>
+  <div class="flow">
+
+    <div class="legend">
+      <div class="legend-item"><div class="ldot" style="background:#0070f3"></div>Entry / UI</div>
+      <div class="legend-item"><div class="ldot" style="background:#6d28d9"></div>API call</div>
+      <div class="legend-item"><div class="ldot" style="background:#2563eb"></div>Database</div>
+      <div class="legend-item"><div class="ldot" style="background:#059669"></div>Card network</div>
+      <div class="legend-item"><div class="ldot" style="background:#7c3aed"></div>Void / time-check</div>
+      <div class="legend-item"><div class="ldot" style="background:#0e7490"></div>Maker-Checker</div>
+    </div>
+
+    <div class="node node-start">
+      <div class="node-icon">🧑‍💼</div>
+      <div class="node-text"><div class="node-label">Merchant initiates refund</div><div class="node-sub">👤 Merchant Dashboard UI</div></div>
+      <div class="node-badge">START</div>
+    </div>
+    <div class="conn conn-blue"></div>
+
+    <div class="node node-api">
+      <div class="node-icon">🔌</div>
+      <div class="node-text"><div class="node-label">Merchant Dashboard → Refund Portal</div><div class="node-sub">📤 POST /refund · { amount, confirmation_code }</div></div>
+      <div class="node-badge">API CALL</div>
+    </div>
+    <div class="conn"></div>
+
+    <div class="node node-db">
+      <div class="node-icon">🗄️</div>
+      <div class="node-text"><div class="node-label">Refund Portal queries Fusion DB</div><div class="node-sub">🔍 payment_type · payment_method · original_amount · remaining_balance</div></div>
+      <div class="node-badge">DB QUERY</div>
+    </div>
+    <div class="conn"></div>
+
+    <div class="divider"><span>Transaction found · Refund Portal creates refund request</span></div>
+    <div class="conn conn-maker"></div>
+
+    <div class="maker-panel">
+      <div class="maker-header">
+        <div class="maker-header-icon">🔐</div>
+        <div class="maker-title">Maker-Checker · Handled by Refund Portal</div>
+        <div class="maker-badge">ACCESS CONTROL</div>
+      </div>
+      <div class="maker-body">
+        <div class="maker-row">
+          <div class="maker-row-icon">✍️</div>
+          <div>
+            <div class="maker-row-label">Maker — Submits Refund Request</div>
+            <div class="maker-row-sub">Portal logs request as pending-approval · Merchant-side initiator confirms amount &amp; payment_type from DB</div>
+          </div>
+        </div>
+        <div class="maker-row">
+          <div class="maker-row-icon">👁️</div>
+          <div>
+            <div class="maker-row-label">Checker — Reviews &amp; Authorises</div>
+            <div class="maker-row-sub">Second authorised user reviews request details · approves or rejects</div>
+          </div>
+        </div>
+        <div class="maker-outcomes">
+          <div class="maker-outcome maker-approve">✅ APPROVED<br>Flow continues →</div>
+          <div class="maker-outcome maker-reject">❌ REJECTED<br>Request cancelled · Merchant notified</div>
+        </div>
+      </div>
+    </div>
+    <div class="conn conn-maker"></div>
+
+    <div class="divider"><span>Refund Portal determines payment method — Card confirmed</span></div>
+    <div class="conn"></div>
+
+    <div class="decision-wrap">
+      <div class="decision-label">Refund Portal — checks payment_type</div>
+      <div class="diamond">Ecom &nbsp;or&nbsp; POS?</div>
+    </div>
+    <div class="conn"></div>
+
+    <!-- Ecom / POS branches -->
+    <div class="branches">
+
+      <!-- ECOM -->
+      <div class="branch">
+        <div class="blabel blabel-card">Ecom</div>
+        <div class="bconn bconn-card"></div>
+        <div style="padding:8px;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:6px;text-align:center;font-size:11px;width:100%;margin-top:6px">
+          <strong>Portal → Charging Express</strong><br>
+          <span style="font-size:9px;color:var(--text-muted)">Routes to Visa / Mastercard / Amex</span>
+        </div>
+        <div class="bconn bconn-card" style="margin-top:4px"></div>
+        <div class="node node-void" style="width:100%;margin-top:6px">
+          <div class="node-icon">⏱️</div>
+          <div class="node-text"><div class="node-label">Transaction age check</div><div class="node-sub">⚡ &lt; 24 hrs → Void &nbsp;|&nbsp; &gt; 24 hrs → Reverse</div></div>
+        </div>
+        <div class="bconn bconn-card"></div>
+        <div class="node node-success" style="width:100%">
+          <div class="node-icon">🏦</div>
+          <div class="node-text"><div class="node-label">Charging Express → Card Network</div><div class="node-sub">📤 Void or Reverse transaction · Card Network confirms</div></div>
+        </div>
+        <div class="bconn bconn-card"></div>
+        <div class="node node-api" style="width:100%">
+          <div class="node-icon">🔁</div>
+          <div class="node-text"><div class="node-label">Charging Express updates own DB</div><div class="node-sub">💾 Records reversal result internally</div></div>
+        </div>
+        <div class="bconn bconn-card"></div>
+        <div class="node node-db" style="width:100%">
+          <div class="node-icon">📝</div>
+          <div class="node-text"><div class="node-label">Charging Express → Fusion DB</div><div class="node-sub">💾 Refund status, updated balances</div></div>
+        </div>
+        <div class="bconn bconn-card"></div>
+        <div class="callback-row" style="width:100%">
+          <div class="callback-line"></div>
+          <div class="callback-content">
+            <div class="cb-ok" style="font-size:10px">✅ Charging Express → Refund Portal: SUCCESS</div>
+            <div class="cb-fail" style="font-size:10px">❌ Charging Express → Refund Portal: FAILURE</div>
+          </div>
+        </div>
+      </div><!-- /ecom -->
+
+      <!-- POS -->
+      <div class="branch">
+        <div class="blabel blabel-card">POS</div>
+        <div class="bconn bconn-card"></div>
+        <div style="padding:8px;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:6px;text-align:center;font-size:11px;width:100%;margin-top:6px">
+          <strong>Portal → POS</strong><br>
+          <span style="font-size:9px;color:var(--text-muted)">Routes to Visa / Mastercard / Amex</span>
+        </div>
+        <div class="bconn bconn-card" style="margin-top:4px"></div>
+        <div class="node node-void" style="width:100%;margin-top:6px">
+          <div class="node-icon">⏱️</div>
+          <div class="node-text"><div class="node-label">Transaction age check</div><div class="node-sub">⚡ &lt; 24 hrs → Void &nbsp;|&nbsp; &gt; 24 hrs → Reverse</div></div>
+        </div>
+        <div class="bconn bconn-card"></div>
+        <div class="node node-success" style="width:100%">
+          <div class="node-icon">🏦</div>
+          <div class="node-text"><div class="node-label">POS → Card Network</div><div class="node-sub">📤 Void or Reverse transaction · Card Network confirms</div></div>
+        </div>
+        <div class="bconn bconn-card"></div>
+        <div class="node node-api" style="width:100%">
+          <div class="node-icon">🔁</div>
+          <div class="node-text"><div class="node-label">POS updates own DB</div><div class="node-sub">💾 Records reversal result internally</div></div>
+        </div>
+        <div class="bconn bconn-card"></div>
+        <div class="node node-db" style="width:100%">
+          <div class="node-icon">📝</div>
+          <div class="node-text"><div class="node-label">POS → Fusion DB</div><div class="node-sub">💾 Refund status, updated balances</div></div>
+        </div>
+        <div class="bconn bconn-card"></div>
+        <div class="callback-row" style="width:100%">
+          <div class="callback-line"></div>
+          <div class="callback-content">
+            <div class="cb-ok" style="font-size:10px">✅ POS → Refund Portal: SUCCESS</div>
+            <div class="cb-fail" style="font-size:10px">❌ POS → Refund Portal: FAILURE</div>
+          </div>
+        </div>
+      </div><!-- /pos -->
+
+    </div><!-- /branches -->
+
+    <div class="conn"></div>
+    <div class="merge"><div class="merge-icon">⇣</div><div class="merge-text">Refund Portal receives final callback status</div></div>
+    <div class="conn conn-blue"></div>
+
+    <div class="node node-success">
+      <div class="node-icon">🔔</div>
+      <div class="node-text"><div class="node-label">Refund Portal → Merchant Dashboard</div><div class="node-sub">📤 Send success / failure result</div></div>
+      <div class="node-badge">NOTIFY</div>
+    </div>
+    <div class="conn conn-blue"></div>
+
+    <div class="node node-end">
+      <div class="node-icon">✅</div>
+      <div class="node-text"><div class="node-label">Merchant Dashboard pulls updated records from Fusion DB</div><div class="node-sub">📥 Updated balances, refund history &amp; confirmation</div></div>
+      <div class="node-badge">END</div>
+    </div>
+
+  </div>
+</div><!-- /panel-w2 -->
+
+
+<!-- ══════════════════════════════════════════
+     WORKFLOW 3 — SUPPORT ADMIN · MPESA
+     ══════════════════════════════════════════ -->
+<div class="workflow-panel" id="panel-w3">
+  <div class="workflow-title"><span class="live-dot"></span>Workflow 3 — Support Admin · Mpesa Refund</div>
+  <div class="flow">
+
+    <div class="legend">
+      <div class="legend-item"><div class="ldot" style="background:#0070f3"></div>Entry / UI</div>
+      <div class="legend-item"><div class="ldot" style="background:#6d28d9"></div>API call</div>
+      <div class="legend-item"><div class="ldot" style="background:#2563eb"></div>Database</div>
+      <div class="legend-item"><div class="ldot" style="background:#d97706"></div>External service</div>
+      <div class="legend-item"><div class="ldot" style="background:#059669"></div>Success / notify</div>
+      <div class="legend-item"><div class="ldot" style="background:#7c3aed"></div>Momo Manager</div>
+      <div class="legend-item"><div class="ldot" style="background:#0e7490"></div>Maker-Checker</div>
+    </div>
+
+    <!-- Entry -->
+    <div class="node node-start">
+      <div class="node-icon">🎫</div>
+      <div class="node-text"><div class="node-label">Merchant raises ticket with support team</div><div class="node-sub">📞 Support channel / ticketing system</div></div>
+      <div class="node-badge">TRIGGER</div>
+    </div>
+    <div class="conn conn-blue"></div>
+
+    <div class="node node-start">
+      <div class="node-icon">🔑</div>
+      <div class="node-text"><div class="node-label">Support Admin logs in to Refund Portal Dashboard</div><div class="node-sub">🔐 Authenticated admin session</div></div>
+      <div class="node-badge">AUTH</div>
+    </div>
+    <div class="conn"></div>
+
+    <!-- Refund type decision — splits into two columns -->
+    <div class="decision-wrap">
+      <div class="decision-label">Admin selects refund type</div>
+      <div class="diamond">POS / Ecom &nbsp;&nbsp;or&nbsp;&nbsp; MOMO Manager?</div>
+    </div>
+    <div class="conn"></div>
+
+    <!-- TWO top-level columns: POS/Ecom (shared spine) vs Momo Manager -->
+    <div style="display:flex;gap:20px;width:600px;align-items:flex-start;">
+
+      <!-- ══ LEFT COLUMN: POS / Ecom — shared spine ══ -->
+      <div style="flex:1.1;display:flex;flex-direction:column;align-items:center;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;padding:4px 14px;border-radius:5px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;margin-bottom:12px;text-transform:uppercase;letter-spacing:.07em;">POS / Ecom</div>
+
+        <!-- 1. Admin input -->
+        <div class="node node-api" style="width:100%">
+          <div class="node-icon">⌨️</div>
+          <div class="node-text"><div class="node-label">Admin enters amount &amp; confirmation code</div><div class="node-sub">📝 Submit via Refund Portal dashboard form</div></div>
+          <div class="node-badge">INPUT</div>
+        </div>
+        <div class="col-conn"></div>
+
+        <!-- 2. DB Query -->
+        <div class="node node-db" style="width:100%">
+          <div class="node-icon">🗄️</div>
+          <div class="node-text"><div class="node-label">Refund Portal queries Fusion DB</div><div class="node-sub">🔍 payment_type · payment_method · original_amount · remaining_balance · shortcode · callback_url</div></div>
+          <div class="node-badge">DB QUERY</div>
+        </div>
+        <div style="width:100%;display:flex;align-items:center;gap:8px;margin:6px 0;">
+          <div style="flex:1;height:1px;background:var(--border)"></div>
+          <span style="font-size:9px;font-family:'IBM Plex Mono',monospace;color:var(--text-muted);white-space:nowrap;text-transform:uppercase;letter-spacing:.08em;">Transaction found · Portal creates refund request</span>
+          <div style="flex:1;height:1px;background:var(--border)"></div>
+        </div>
+        <div style="width:2px;height:12px;background:var(--maker);margin:0 auto;position:relative;"><div style="position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);border-left:4px solid transparent;border-right:4px solid transparent;border-top:5px solid var(--maker);"></div></div>
+
+        <!-- 3. Maker-Checker -->
+        <div class="maker-panel-sm" style="margin-top:6px">
+          <div class="maker-header maker-header-sm">
+            <div class="maker-header-icon" style="width:22px;height:22px;font-size:12px;">🔐</div>
+            <div class="maker-title maker-title-sm">Maker-Checker · Refund Portal</div>
+            <div class="maker-badge maker-badge-sm">ACCESS CONTROL</div>
+          </div>
+          <div class="maker-body maker-body-sm">
+            <div class="maker-row maker-row-sm">
+              <div class="maker-row-icon maker-row-icon-sm">✍️</div>
+              <div><div class="maker-row-label maker-row-label-sm">Maker — Submits Refund Request</div><div class="maker-row-sub maker-row-sub-sm">Admin initiator logs request · Portal records as pending-approval with payment_type &amp; shortcode from DB</div></div>
+            </div>
+            <div class="maker-row maker-row-sm">
+              <div class="maker-row-icon maker-row-icon-sm">👁️</div>
+              <div><div class="maker-row-label maker-row-label-sm">Checker — Reviews &amp; Authorises</div><div class="maker-row-sub maker-row-sub-sm">Second admin reviews &amp; approves or rejects</div></div>
+            </div>
+            <div class="maker-outcomes">
+              <div class="maker-outcome maker-approve maker-outcome-sm">✅ APPROVED</div>
+              <div class="maker-outcome maker-reject maker-outcome-sm">❌ REJECTED</div>
+            </div>
+          </div>
+        </div>
+        <div style="width:2px;height:12px;background:var(--maker);margin:0 auto;position:relative;"><div style="position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);border-left:4px solid transparent;border-right:4px solid transparent;border-top:5px solid var(--maker);"></div></div>
+
+        <!-- 4. Portal → Mpesa Refunds (shared) -->
+        <div class="node node-ext" style="width:100%;margin-top:6px">
+          <div class="node-icon">💸</div>
+          <div class="node-text"><div class="node-label">Refund Portal → Mpesa Refunds Service</div><div class="node-sub">📤 Sends: shortcode · amount · callback_url · payment_type flag</div></div>
+          <div class="node-badge">REQUEST</div>
+        </div>
+        <div class="col-conn" style="background:#d97706"></div>
+
+        <!-- 5. Safaricom (shared) -->
+        <div class="node node-ext" style="width:100%">
+          <div class="node-icon">📡</div>
+          <div class="node-text"><div class="node-label">Mpesa Refunds Service → Safaricom API</div><div class="node-sub">📤 Reverse payment on Safaricom end</div></div>
+        </div>
+        <div class="col-conn" style="background:#d97706"></div>
+
+        <!-- 6. Callback (shared) -->
+        <div class="callback-row" style="width:100%">
+          <div class="callback-line"></div>
+          <div class="callback-content">
+            <div class="cb-ok" style="font-size:10px">✅ Mpesa Refunds Service → Refund Portal: SUCCESS</div>
+            <div class="cb-fail" style="font-size:10px">❌ Mpesa Refunds Service → Refund Portal: FAILURE</div>
+          </div>
+        </div>
+        <div class="col-conn"></div>
+
+        <!-- 7. Branch on payment_type — notify only -->
+        <div style="width:100%;display:flex;align-items:center;gap:8px;margin:4px 0;">
+          <div style="flex:1;height:1px;background:var(--border)"></div>
+          <span style="font-size:9px;font-family:'IBM Plex Mono',monospace;color:var(--text-muted);white-space:nowrap;text-transform:uppercase;letter-spacing:.08em;">Route status notification by payment_type</span>
+          <div style="flex:1;height:1px;background:var(--border)"></div>
+        </div>
+        <div class="col-conn"></div>
+
+        <div style="display:flex;flex-direction:column;align-items:center;width:100%">
+          <div style="font-size:9px;font-family:'IBM Plex Mono',monospace;color:var(--text-muted);text-transform:uppercase;letter-spacing:.09em;margin-bottom:4px">Notification route — payment_type from DB</div>
+          <div class="diamond" style="font-size:10px;padding:9px 14px">Ecom &nbsp;or&nbsp; POS?</div>
+        </div>
+        <div class="col-conn"></div>
+
+        <div style="display:flex;gap:10px;width:100%">
+          <!-- Ecom notify -->
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+            <div class="blabel blabel-mpesa" style="font-size:9px;margin-bottom:6px">Ecom</div>
+            <div class="bconn bconn-mpesa"></div>
+            <div class="node node-api" style="width:100%">
+              <div class="node-icon">🔁</div>
+              <div class="node-text"><div class="node-label">Portal → Pesapal Mobile</div><div class="node-sub">📤 Notify status</div></div>
+            </div>
+            <div class="bconn bconn-mpesa"></div>
+            <div class="node node-db" style="width:100%">
+              <div class="node-icon">📝</div>
+              <div class="node-text"><div class="node-label">Pesapal Mobile → Fusion DB</div><div class="node-sub">💾 Updated balances</div></div>
+            </div>
+          </div>
+          <!-- POS notify -->
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+            <div class="blabel blabel-mpesa" style="font-size:9px;margin-bottom:6px">POS</div>
+            <div class="bconn bconn-mpesa"></div>
+            <div class="node node-api" style="width:100%">
+              <div class="node-icon">🔁</div>
+              <div class="node-text"><div class="node-label">Portal → MOMOPos</div><div class="node-sub">📤 Notify status</div></div>
+            </div>
+            <div class="bconn bconn-mpesa"></div>
+            <div class="node node-db" style="width:100%">
+              <div class="node-icon">📝</div>
+              <div class="node-text"><div class="node-label">MOMOPos → Fusion DB</div><div class="node-sub">💾 Updated balances</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-conn"></div>
+        <div class="node node-result" style="width:100%">
+          <div class="node-icon">🖥️</div>
+          <div class="node-text"><div class="node-label">Portal displays result to Admin</div><div class="node-sub">✅ Success &nbsp;or&nbsp; ❌ Failure</div></div>
+          <div class="node-badge">RESULT</div>
+        </div>
+      </div><!-- /left col -->
+
+      <!-- Column divider -->
+      <div style="width:1px;background:var(--border);align-self:stretch;flex-shrink:0;margin:24px 0;"></div>
+
+      <!-- ══ RIGHT COLUMN: MOMO Manager ══ -->
+      <div style="flex:0.9;display:flex;flex-direction:column;align-items:center;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;padding:4px 14px;border-radius:5px;background:#ede9fe;color:#5b21b6;border:1px solid #c4b5fd;margin-bottom:12px;text-transform:uppercase;letter-spacing:.07em;">Momo Manager</div>
+
+        <div class="node node-process" style="width:100%">
+          <div class="node-icon">📋</div>
+          <div class="node-text"><div class="node-label">Admin selects till number</div><div class="node-sub">📝 220220 &nbsp;or&nbsp; 330330</div></div>
+        </div>
+        <div class="col-conn"></div>
+
+        <div class="node node-process" style="width:100%">
+          <div class="node-icon">⌨️</div>
+          <div class="node-text"><div class="node-label">Admin enters refund details</div><div class="node-sub">📝 Amount · confirmation code · partial or full refund</div></div>
+        </div>
+        <div class="col-conn"></div>
+
+        <!-- Refund type decision -->
+        <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
+          <div style="font-size:9px;font-family:'IBM Plex Mono',monospace;color:var(--text-muted);text-transform:uppercase;letter-spacing:.09em;margin-bottom:4px;">Refund type?</div>
+          <div class="diamond" style="font-size:10px;padding:9px 14px;width:100%;text-align:center;">Partial &nbsp;or&nbsp; Full?</div>
+        </div>
+        <div class="col-conn"></div>
+
+        <!-- Two sub-branches: partial vs full -->
+        <div style="display:flex;gap:10px;width:100%;align-items:flex-start;">
+
+          <!-- Partial -->
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+            <div class="blabel blabel-momo" style="font-size:9px;margin-bottom:6px;">Partial</div>
+            <div class="bconn bconn-momo"></div>
+            <div class="node node-process" style="width:100%;">
+              <div class="node-icon">📱</div>
+              <div class="node-text">
+                <div class="node-label">Portal prompts for receiver phone number</div>
+                <div class="node-sub">📝 Mpesa number to receive the partial refund amount</div>
+              </div>
+              <div class="node-badge" style="background:#ede9fe;color:#5b21b6;border:1px solid #c4b5fd;">REQUIRED</div>
+            </div>
+            <div class="bconn bconn-momo"></div>
+            <div class="node node-process" style="width:100%;">
+              <div class="node-icon">✅</div>
+              <div class="node-text">
+                <div class="node-label">Admin confirms phone &amp; partial amount</div>
+                <div class="node-sub">📝 Portal validates number format before proceeding</div>
+              </div>
+            </div>
+          </div><!-- /partial -->
+
+          <!-- Full -->
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+            <div class="blabel blabel-momo" style="font-size:9px;margin-bottom:6px;">Full</div>
+            <div class="bconn bconn-momo"></div>
+            <div style="padding:8px 10px;background:#f5f3ff;border:1px solid #c4b5fd;border-radius:6px;text-align:center;font-size:10px;width:100%;color:#5b21b6;font-family:'IBM Plex Mono',monospace;">
+              No extra input needed<br>
+              <span style="font-size:9px;color:var(--text-muted);">Refund goes to original sender</span>
+            </div>
+          </div><!-- /full -->
+
+        </div><!-- /sub-branches -->
+
+        <!-- Merge back -->
+        <div class="col-conn"></div>
+        <div style="width:100%;border:1px dashed var(--border);border-radius:6px;padding:7px 12px;display:flex;align-items:center;gap:8px;background:var(--surface2);">
+          <div style="font-size:12px;color:var(--text-muted)">⇣</div>
+          <div style="font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">Paths merge · Portal creates refund request</div>
+        </div>
+        <div style="width:2px;height:12px;background:var(--maker);margin:0 auto;position:relative;"><div style="position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);border-left:4px solid transparent;border-right:4px solid transparent;border-top:5px solid var(--maker);"></div></div>
+
+        <div class="maker-panel-sm" style="margin-top:6px">
+          <div class="maker-header maker-header-sm">
+            <div class="maker-header-icon" style="width:22px;height:22px;font-size:12px;">🔐</div>
+            <div class="maker-title maker-title-sm">Maker-Checker · Refund Portal</div>
+            <div class="maker-badge maker-badge-sm">ACCESS CONTROL</div>
+          </div>
+          <div class="maker-body maker-body-sm">
+            <div class="maker-row maker-row-sm">
+              <div class="maker-row-icon maker-row-icon-sm">✍️</div>
+              <div><div class="maker-row-label maker-row-label-sm">Maker — Submits Refund</div><div class="maker-row-sub maker-row-sub-sm">Admin submits till, amount &amp; code · Portal logs as pending-approval</div></div>
+            </div>
+            <div class="maker-row maker-row-sm">
+              <div class="maker-row-icon maker-row-icon-sm">👁️</div>
+              <div><div class="maker-row-label maker-row-label-sm">Checker — Reviews &amp; Authorises</div><div class="maker-row-sub maker-row-sub-sm">Second admin reviews &amp; approves or rejects</div></div>
+            </div>
+            <div class="maker-outcomes">
+              <div class="maker-outcome maker-approve maker-outcome-sm">✅ APPROVED</div>
+              <div class="maker-outcome maker-reject maker-outcome-sm">❌ REJECTED</div>
+            </div>
+          </div>
+        </div>
+        <div style="width:2px;height:12px;background:var(--maker);margin:0 auto;position:relative;"><div style="position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);border-left:4px solid transparent;border-right:4px solid transparent;border-top:5px solid var(--maker);"></div></div>
+
+        <div class="node node-ext" style="width:100%;margin-top:6px">
+          <div class="node-icon">💸</div>
+          <div class="node-text"><div class="node-label">Portal → Mpesa Refunds Service</div><div class="node-sub">📤 Direct request — no DB lookup needed</div></div>
+          <div class="node-badge">REQUEST</div>
+        </div>
+        <div class="col-conn" style="background:#d97706"></div>
+
+        <div class="node node-ext" style="width:100%">
+          <div class="node-icon">📡</div>
+          <div class="node-text"><div class="node-label">Mpesa Refunds Service → Safaricom API</div><div class="node-sub">📤 Reverse payment on Safaricom end</div></div>
+        </div>
+        <div class="col-conn" style="background:#d97706"></div>
+
+        <div class="callback-row" style="width:100%">
+          <div class="callback-line"></div>
+          <div class="callback-content">
+            <div class="cb-ok" style="font-size:9px">✅ Mpesa Refunds Service → Portal: SUCCESS</div>
+            <div class="cb-fail" style="font-size:9px">❌ Mpesa Refunds Service → Portal: FAILURE</div>
+          </div>
+        </div>
+        <div class="col-conn"></div>
+
+        <div class="node node-result" style="width:100%">
+          <div class="node-icon">🖥️</div>
+          <div class="node-text"><div class="node-label">Portal shows status to Admin</div><div class="node-sub">✅ Success &nbsp;or&nbsp; ❌ Failure</div></div>
+          <div class="node-badge">RESULT</div>
+        </div>
+        <div class="col-conn" style="height:10px;background:none;"></div>
+
+        <div class="phase-box" style="width:100%">
+          <div class="phase-box-title">⚠️ External Biller Notification</div>
+          <div style="font-size:9px;color:#92400e;font-family:'IBM Plex Mono',monospace;margin-bottom:8px;line-height:1.4;">
+            MOMO Manager involves external billers (JTL, DSTV, Airtel, etc.) who must be informed of the reversal.
+          </div>
+          <div class="phase-row">
+            <div class="phase-badge phase-badge-1">Phase 1 · Now</div>
+            <div>Manual — Admin logs in to each provider's dashboard and updates the reversal manually.</div>
+          </div>
+          <div class="phase-row">
+            <div class="phase-badge phase-badge-2">Phase 2 · Future</div>
+            <div>Automated — Portal sends reversal details to biller callback URLs automatically on success.</div>
+          </div>
+        </div>
+      </div><!-- /right col -->
+
+    </div><!-- /two cols -->
+
+  </div>
+</div><!-- /panel-w3 -->
+
+
+<!-- ══════════════════════════════════════════
+     WORKFLOW 4 — SUPPORT ADMIN · CARD
+     ══════════════════════════════════════════ -->
+<div class="workflow-panel" id="panel-w4">
+  <div class="workflow-title"><span class="live-dot"></span>Workflow 4 — Support Admin · Card Refund</div>
+  <div class="flow">
+
+    <div class="legend">
+      <div class="legend-item"><div class="ldot" style="background:#0070f3"></div>Entry / UI</div>
+      <div class="legend-item"><div class="ldot" style="background:#6d28d9"></div>API call</div>
+      <div class="legend-item"><div class="ldot" style="background:#2563eb"></div>Database</div>
+      <div class="legend-item"><div class="ldot" style="background:#059669"></div>Card network</div>
+      <div class="legend-item"><div class="ldot" style="background:#7c3aed"></div>Void / time-check</div>
+      <div class="legend-item"><div class="ldot" style="background:#0e7490"></div>Maker-Checker</div>
+    </div>
+
+    <!-- Entry -->
+    <div class="node node-start">
+      <div class="node-icon">🎫</div>
+      <div class="node-text"><div class="node-label">Merchant raises ticket with support team</div><div class="node-sub">📞 Support channel / ticketing system</div></div>
+      <div class="node-badge">TRIGGER</div>
+    </div>
+    <div class="conn conn-blue"></div>
+
+    <div class="node node-start">
+      <div class="node-icon">🔑</div>
+      <div class="node-text"><div class="node-label">Support Admin logs in to Refund Portal Dashboard</div><div class="node-sub">🔐 Authenticated admin session</div></div>
+      <div class="node-badge">AUTH</div>
+    </div>
+    <div class="conn"></div>
+
+    <!-- Admin input — happens before DB query -->
+    <div class="node node-api">
+      <div class="node-icon">⌨️</div>
+      <div class="node-text"><div class="node-label">Admin enters amount &amp; confirmation code</div><div class="node-sub">📝 Submit via Refund Portal dashboard form</div></div>
+      <div class="node-badge">INPUT</div>
+    </div>
+    <div class="conn"></div>
+
+    <!-- DB Query -->
+    <div class="node node-db">
+      <div class="node-icon">🗄️</div>
+      <div class="node-text"><div class="node-label">Refund Portal queries Fusion DB</div><div class="node-sub">🔍 payment_type · payment_method · original_amount · remaining_balance</div></div>
+      <div class="node-badge">DB QUERY</div>
+    </div>
+    <div class="conn"></div>
+
+    <div class="divider"><span>Transaction found · Portal creates refund request</span></div>
+    <div class="conn conn-maker"></div>
+
+    <!-- Maker-Checker — after DB lookup -->
+    <div class="maker-panel">
+      <div class="maker-header">
+        <div class="maker-header-icon">🔐</div>
+        <div class="maker-title">Maker-Checker · Handled by Refund Portal</div>
+        <div class="maker-badge">ACCESS CONTROL</div>
+      </div>
+      <div class="maker-body">
+        <div class="maker-row">
+          <div class="maker-row-icon">✍️</div>
+          <div>
+            <div class="maker-row-label">Maker — Submits Refund Request</div>
+            <div class="maker-row-sub">Admin initiator logs request · Portal records as pending-approval with payment_type from DB</div>
+          </div>
+        </div>
+        <div class="maker-row">
+          <div class="maker-row-icon">👁️</div>
+          <div>
+            <div class="maker-row-label">Checker — Reviews &amp; Authorises</div>
+            <div class="maker-row-sub">Second authorised admin reviews request details · approves or rejects</div>
+          </div>
+        </div>
+        <div class="maker-outcomes">
+          <div class="maker-outcome maker-approve">✅ APPROVED<br>Flow continues →</div>
+          <div class="maker-outcome maker-reject">❌ REJECTED<br>Request cancelled</div>
+        </div>
+      </div>
+    </div>
+    <div class="conn conn-maker"></div>
+
+    <div class="divider"><span>Refund Portal routes by payment_type — Card confirmed</span></div>
+    <div class="conn"></div>
+
+    <!-- Ecom / POS decision -->
+    <div class="decision-wrap">
+      <div class="decision-label">Refund Portal — checks payment_type</div>
+      <div class="diamond">Ecom &nbsp;or&nbsp; POS?</div>
+    </div>
+    <div class="conn"></div>
+
+    <!-- Branches -->
+    <div class="branches">
+
+      <!-- ECOM -->
+      <div class="branch">
+        <div class="blabel blabel-card">Ecom</div>
+        <div class="bconn bconn-card"></div>
+        <div style="padding:8px;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:6px;text-align:center;font-size:11px;width:100%;margin-top:6px">
+          <strong>Portal → Charging Express</strong><br>
+          <span style="font-size:9px;color:var(--text-muted)">Routes to Visa / Mastercard / Amex</span>
+        </div>
+        <div class="bconn bconn-card" style="margin-top:4px"></div>
+        <div class="node node-void" style="width:100%;margin-top:6px">
+          <div class="node-icon">⏱️</div>
+          <div class="node-text"><div class="node-label">Transaction age check</div><div class="node-sub">⚡ &lt; 24 hrs → Void &nbsp;|&nbsp; &gt; 24 hrs → Reverse</div></div>
+        </div>
+        <div class="bconn bconn-card"></div>
+        <div class="node node-success" style="width:100%">
+          <div class="node-icon">🏦</div>
+          <div class="node-text"><div class="node-label">Charging Express → Card Network</div><div class="node-sub">📤 Void or Reverse · Card Network confirms</div></div>
+        </div>
+        <div class="bconn bconn-card"></div>
+        <div class="node node-api" style="width:100%">
+          <div class="node-icon">🔁</div>
+          <div class="node-text"><div class="node-label">Charging Express updates own DB</div><div class="node-sub">💾 Records reversal result internally</div></div>
+        </div>
+        <div class="bconn bconn-card"></div>
+        <div class="node node-db" style="width:100%">
+          <div class="node-icon">📝</div>
+          <div class="node-text"><div class="node-label">Charging Express → Fusion DB</div><div class="node-sub">💾 Refund status, updated balances</div></div>
+        </div>
+        <div class="bconn bconn-card"></div>
+        <div class="callback-row" style="width:100%">
+          <div class="callback-line"></div>
+          <div class="callback-content">
+            <div class="cb-ok" style="font-size:10px">✅ Charging Express → Refund Portal: SUCCESS</div>
+            <div class="cb-fail" style="font-size:10px">❌ Charging Express → Refund Portal: FAILURE</div>
+          </div>
+        </div>
+      </div><!-- /ecom -->
+
+      <!-- POS -->
+      <div class="branch">
+        <div class="blabel blabel-card">POS</div>
+        <div class="bconn bconn-card"></div>
+        <div style="padding:8px;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:6px;text-align:center;font-size:11px;width:100%;margin-top:6px">
+          <strong>Portal → MPOS</strong><br>
+          <span style="font-size:9px;color:var(--text-muted)">Routes to Visa / Mastercard / Amex</span>
+        </div>
+        <div class="bconn bconn-card" style="margin-top:4px"></div>
+        <div class="node node-void" style="width:100%;margin-top:6px">
+          <div class="node-icon">⏱️</div>
+          <div class="node-text"><div class="node-label">Transaction age check</div><div class="node-sub">⚡ &lt; 24 hrs → Void &nbsp;|&nbsp; &gt; 24 hrs → Reverse</div></div>
+        </div>
+        <div class="bconn bconn-card"></div>
+        <div class="node node-success" style="width:100%">
+          <div class="node-icon">🏦</div>
+          <div class="node-text"><div class="node-label">MPOS → Card Network</div><div class="node-sub">📤 Void or Reverse · Card Network confirms</div></div>
+        </div>
+        <div class="bconn bconn-card"></div>
+        <div class="node node-api" style="width:100%">
+          <div class="node-icon">🔁</div>
+          <div class="node-text"><div class="node-label">MPOS updates own DB</div><div class="node-sub">💾 Records reversal result internally</div></div>
+        </div>
+        <div class="bconn bconn-card"></div>
+        <div class="node node-db" style="width:100%">
+          <div class="node-icon">📝</div>
+          <div class="node-text"><div class="node-label">MPOS → Fusion DB</div><div class="node-sub">💾 Refund status, updated balances</div></div>
+        </div>
+        <div class="bconn bconn-card"></div>
+        <div class="callback-row" style="width:100%">
+          <div class="callback-line"></div>
+          <div class="callback-content">
+            <div class="cb-ok" style="font-size:10px">✅ MPOS → Refund Portal: SUCCESS</div>
+            <div class="cb-fail" style="font-size:10px">❌ MPOS → Refund Portal: FAILURE</div>
+          </div>
+        </div>
+      </div><!-- /pos -->
+
+    </div><!-- /branches -->
+
+    <div class="conn"></div>
+    <div class="merge"><div class="merge-icon">⇣</div><div class="merge-text">Refund Portal receives final callback status</div></div>
+    <div class="conn conn-blue"></div>
+
+    <div class="node node-result">
+      <div class="node-icon">🖥️</div>
+      <div class="node-text"><div class="node-label">Refund Portal displays result to Admin</div><div class="node-sub">✅ Success message &nbsp;or&nbsp; ❌ Failure message</div></div>
+      <div class="node-badge">RESULT</div>
+    </div>
+
+  </div>
+</div><!-- /panel-w4 -->
+
+
+<!-- ══════════════════════════════════════════
+     WORKFLOW 5 — KPLC AUTO REVERSALS · MPESA
+     ══════════════════════════════════════════ -->
+<div class="workflow-panel" id="panel-w5">
+  <div class="workflow-title"><span class="live-dot"></span>Workflow 5 — KPLC Auto Reversals · Mpesa</div>
+  <div class="flow">
+
+    <div class="legend">
+      <div class="legend-item"><div class="ldot" style="background:#0070f3"></div>Entry / system</div>
+      <div class="legend-item"><div class="ldot" style="background:#6d28d9"></div>API call</div>
+      <div class="legend-item"><div class="ldot" style="background:#d97706"></div>External service</div>
+      <div class="legend-item"><div class="ldot" style="background:#059669"></div>Callback / response</div>
+    </div>
+
+    <!-- Automated badge -->
+    <div style="width:600px;display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:8px;background:#fef9ec;border:2px dashed #fbbf24;margin-bottom:20px;">
+      <div style="font-size:18px;">⚡</div>
+      <div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.07em;">Fully Automated Flow — No Maker-Checker</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px;font-family:'IBM Plex Mono',monospace;">Buni initiates reversals programmatically · Refund Portal processes without human approval step</div>
+      </div>
+    </div>
+
+    <!-- 1. Buni triggers reversal -->
+    <div class="node node-start">
+      <div class="node-icon">🏭</div>
+      <div class="node-text">
+        <div class="node-label">Buni — triggers reversal request</div>
+        <div class="node-sub">⚡ Automated system event · KPLC payment reversal identified</div>
+      </div>
+      <div class="node-badge">TRIGGER</div>
+    </div>
+    <div class="conn conn-blue"></div>
+
+    <!-- 2. Buni → Refund Portal -->
+    <div class="node node-api">
+      <div class="node-icon">🔌</div>
+      <div class="node-text">
+        <div class="node-label">Buni → Refund Portal</div>
+        <div class="node-sub">📤 POST /auto-refund · { confirmation_code, amount, shortcode, callback_url }</div>
+      </div>
+      <div class="node-badge">API CALL</div>
+    </div>
+    <div class="conn"></div>
+
+    <!-- No Maker-Checker callout -->
+    <div style="width:600px;display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:6px;background:#fff1f2;border:1px solid #fca5a5;margin:2px 0;">
+      <div style="font-size:13px;">🚫</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;color:#991b1b;text-transform:uppercase;letter-spacing:.06em;">Maker-Checker skipped — automated pipeline, no human approval required</div>
+    </div>
+    <div class="conn"></div>
+
+    <!-- 3. Portal → Mpesa Refunds Service -->
+    <div class="node node-ext">
+      <div class="node-icon">💸</div>
+      <div class="node-text">
+        <div class="node-label">Refund Portal → Mpesa Refunds Service</div>
+        <div class="node-sub">📤 Forwards: shortcode · amount · callback_url</div>
+      </div>
+      <div class="node-badge">REQUEST</div>
+    </div>
+    <div class="conn" style="background:#d97706"></div>
+
+    <!-- 4. Mpesa Refunds → Safaricom -->
+    <div class="node node-ext">
+      <div class="node-icon">📡</div>
+      <div class="node-text">
+        <div class="node-label">Mpesa Refunds Service → Safaricom API</div>
+        <div class="node-sub">📤 Execute reversal on Safaricom end</div>
+      </div>
+    </div>
+    <div class="conn" style="background:#d97706"></div>
+
+    <!-- 5. Callback to Portal -->
+    <div class="callback-row" style="width:600px">
+      <div class="callback-line"></div>
+      <div class="callback-content">
+        <div class="cb-ok">✅ Mpesa Refunds Service → Refund Portal: SUCCESS</div>
+        <div class="cb-fail">❌ Mpesa Refunds Service → Refund Portal: FAILURE</div>
+      </div>
+    </div>
+    <div class="conn conn-blue"></div>
+
+    <!-- 6. Refund Portal → Buni -->
+    <div class="node node-success">
+      <div class="node-icon">🔁</div>
+      <div class="node-text">
+        <div class="node-label">Refund Portal → Buni</div>
+        <div class="node-sub">📤 Sends callback with final reversal status · success or failure</div>
+      </div>
+      <div class="node-badge">CALLBACK</div>
+    </div>
+    <div class="conn conn-blue"></div>
+
+    <!-- 7. Buni receives result -->
+    <div class="node node-end">
+      <div class="node-icon">🏭</div>
+      <div class="node-text">
+        <div class="node-label">Buni receives reversal result</div>
+        <div class="node-sub">✅ Updates KPLC payment record &nbsp;or&nbsp; ❌ Flags for retry / investigation</div>
+      </div>
+      <div class="node-badge">END</div>
+    </div>
+
+  </div>
+</div><!-- /panel-w5 -->
+
+</div><!-- /main -->
+
+<script>
+  function switchTab(id, btn) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.workflow-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-' + id).classList.add('active');
+    btn.classList.add('active');
+  }
+</script>
+</body>
+</html>
